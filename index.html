@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Flappy Brush Bird</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+      background: radial-gradient(circle at top center, #e0f7fa 0%, #b2ebf2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    #gameContainer {
+      position: relative;
+      width: 900px;
+      height: 600px;
+    }
+    canvas {
+      background: radial-gradient(circle at top left, #d0f0ff, #a2d4eb);
+      border: 3px solid #333;
+      box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.3);
+    }
+    #scoreBoard {
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 24px;
+  font-weight: bold;
+  color: #ffffff;
+  text-shadow: 1px 1px 2px #000;
+}
+
+  </style>
+</head>
+<body>
+  <div id="gameContainer">
+    <div id="scoreBoard">Distance: 0 m | High Score: 0 m</div>
+    <canvas id="gameCanvas" width="900" height="600"></canvas>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreBoard = document.getElementById('scoreBoard');
+
+    let birdY, birdVelocity, gravity, lift, pipes, pipeSpacing, pipeWidth;
+    let frameCount = 0;
+    let meters = 0;
+    let highScore = localStorage.getItem('highScore') || 0;
+    let gameStarted = false;
+    let gameOver = false;
+
+    function resetGame() {
+      birdY = canvas.height / 2;
+      birdVelocity = 0;
+      gravity = 0.6;
+      lift = -12;
+      pipes = [];
+      pipeSpacing = 250;
+      pipeWidth = 60;
+      frameCount = 0;
+      meters = 0;
+      gameStarted = false;
+      gameOver = false;
+      scoreBoard.textContent = `Distance: 0 m | High Score: ${highScore} m`;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawBird();
+    }
+
+    document.addEventListener('keydown', e => {
+      if (e.code === 'Space' && !gameOver) {
+        birdVelocity = lift;
+        if (!gameStarted) {
+          gameStarted = true;
+          update();
+        }
+      }
+      if (e.code === 'KeyR') {
+        resetGame();
+      }
+    });
+
+    document.addEventListener('mousedown', e => {
+      if (e.button === 0 && !gameOver) {
+        birdVelocity = lift;
+        if (!gameStarted) {
+          gameStarted = true;
+          update();
+        }
+      }
+    });
+
+    function drawBird() {
+      const gradient = ctx.createRadialGradient(100, birdY, 5, 100, birdY, 20);
+      gradient.addColorStop(0, '#ff8a65');
+      gradient.addColorStop(1, '#e64a19');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(100, birdY, 20, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#bf360c';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    function createPipe() {
+      const topHeight = Math.random() * (canvas.height - pipeSpacing - 100) + 20;
+      pipes.push({ x: canvas.width, top: topHeight, bottom: topHeight + pipeSpacing });
+    }
+
+    function drawPipes() {
+      for (let pipe of pipes) {
+        const pipeGrad = ctx.createLinearGradient(pipe.x, 0, pipe.x + pipeWidth, 0);
+        pipeGrad.addColorStop(0, '#66bb6a');
+        pipeGrad.addColorStop(1, '#388e3c');
+        ctx.fillStyle = pipeGrad;
+        ctx.fillRect(pipe.x, 0, pipeWidth, pipe.top);
+        ctx.fillRect(pipe.x, pipe.bottom, pipeWidth, canvas.height - pipe.bottom);
+
+        ctx.fillStyle = 'rgba(0,0,0,0.1)';
+        ctx.fillRect(pipe.x + pipeWidth - 5, 0, 5, pipe.top);
+        ctx.fillRect(pipe.x + pipeWidth - 5, pipe.bottom, 5, canvas.height - pipe.bottom);
+      }
+    }
+
+    function checkCollision(pipe) {
+      const birdX = 100;
+      const birdRadius = 20;
+      const withinPipeX = birdX + birdRadius > pipe.x && birdX - birdRadius < pipe.x + pipeWidth;
+      const hitTop = birdY - birdRadius < pipe.top;
+      const hitBottom = birdY + birdRadius > pipe.bottom;
+      return withinPipeX && (hitTop || hitBottom);
+    }
+
+    function showGameOver() {
+      if (meters > highScore) {
+        highScore = meters;
+        localStorage.setItem('highScore', highScore);
+      }
+
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#fff';
+      ctx.font = '36px Arial';
+      ctx.fillText('Game Over', canvas.width / 2 - 100, canvas.height / 2);
+      ctx.font = '20px Arial';
+      ctx.fillText('Press R to Restart', canvas.width / 2 - 80, canvas.height / 2 + 40);
+      ctx.fillText(`High Score: ${highScore} m`, canvas.width / 2 - 70, canvas.height / 2 + 70);
+    }
+
+    function update() {
+      if (gameOver) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      birdVelocity += gravity;
+      birdY += birdVelocity;
+
+      if (frameCount % 100 === 0) createPipe();
+      frameCount++;
+
+      if (frameCount % 5 === 0) {
+        meters++;
+        scoreBoard.textContent = `Distance: ${meters} m | High Score: ${highScore} m`;
+      }
+
+      pipes.forEach(pipe => pipe.x -= 2);
+      drawBird();
+      drawPipes();
+
+      for (let pipe of pipes) {
+        if (checkCollision(pipe) || birdY > canvas.height || birdY < 0) {
+          gameOver = true;
+          showGameOver();
+          return;
+        }
+      }
+
+      pipes = pipes.filter(pipe => pipe.x + pipeWidth > 0);
+      requestAnimationFrame(update);
+    }
+
+    resetGame();
+  </script>
+</body>
+</html>
